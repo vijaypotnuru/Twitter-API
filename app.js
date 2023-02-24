@@ -174,22 +174,49 @@ app.get("/tweets/:tweetId", authenticateToken, async (request, response) => {
   const { payload } = request;
   const { user_id, name, username, gender } = payload;
   console.log(name, tweetId);
-  const getTweetDetailsQuery = `
+  const tweetsQuery = `SELECT * FROM tweet WHERE tweet_id=${tweetId};`;
+  const tweetsResult = await db.get(tweetsQuery);
+  //   response.send(tweetsResult);
+
+  const userFollowersQuery = `
         SELECT 
-            *
-        FROM 
-            tweet INNER JOIN follower ON tweet.user_id = follower.following_user_id INNER JOIN like ON 
-            like.tweet_id = tweet.tweet_id INNER JOIN reply ON reply.tweet_id = tweet.tweet_id
+           *
+
+        FROM  follower INNER JOIN user ON user.user_id = follower.following_user_id 
+       
         WHERE 
-            follower.follower_user_id = ${user_id} AND tweet.tweet_id = ${tweetId}
-        ;`;
-  const tweetDetails = await db.all(getTweetDetailsQuery);
-  if (tweetDetails === undefined) {
+            follower.follower_user_id  = ${user_id} 
+    ;`;
+
+  const userFollowers = await db.all(userFollowersQuery);
+  // response.send(userFollowers);
+
+  if (
+    userFollowers.some(
+      (item) => item.following_user_id === tweetsResult.user_id
+    )
+  ) {
+    console.log(tweetsResult);
+    console.log("-----------");
+    console.log(userFollowers);
+
+    const getTweetDetailsQuery = `
+            SELECT
+                tweet,
+                COUNT(DISTINCT(like.like_id)) AS likes,
+                COUNT(DISTINCT(reply.reply_id)) AS replies,
+                tweet.date_time AS dateTime
+            FROM 
+                tweet INNER JOIN like ON tweet.tweet_id = like.tweet_id INNER JOIN reply ON reply.tweet_id = tweet.tweet_id
+            WHERE 
+                tweet.tweet_id = ${tweetId} AND tweet.user_id=${userFollowers[0].user_id}
+            ;`;
+
+    const tweetDetails = await db.get(getTweetDetailsQuery);
+    response.send(tweetDetails);
+  } else {
     response.status(401);
     response.send("Invalid Request");
-  } else {
-    console.log(tweetDetails);
-    response.send(tweetDetails);
   }
 });
 
@@ -272,24 +299,18 @@ app.get(
 
 //Get All Tweet of User API-9
 app.get("/user/tweets", authenticateToken, async (request, response) => {
-  const { tweetId } = request;
+
   const { payload } = request;
   const { user_id, name, username, gender } = payload;
   console.log(name, tweetId);
-  const getTweetsDetailsQuery = `
-        SELECT 
-            tweet,
-            COUNT(like.user_id) AS likes,
-            COUNT(reply.reply) AS replies,
-            date_time AS dateTime
-        FROM 
-            tweet INNER JOIN like ON tweet.tweet_id = like.tweet_id INNER JOIN reply ON reply.tweet_id = tweet.tweet_id
-        WHERE 
-               tweet.user_id = ${user_id}
-        GROUP BY 
-            tweet
-        ;`;
-
+   const getTweetsDetailsQuery = `
+            SELECT
+                *
+            FROM 
+                tweet INNER JOIN like ON tweet.tweet_id = like.tweet_id INNER JOIN reply ON reply.tweet_id = tweet.tweet_id
+            WHERE 
+                tweet.user_id = ${user_id}
+            ;`;
   const tweetsDetails = await db.all(getTweetsDetailsQuery);
   response.send(tweetsDetails);
 });
