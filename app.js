@@ -299,18 +299,23 @@ app.get(
 
 //Get All Tweet of User API-9
 app.get("/user/tweets", authenticateToken, async (request, response) => {
-
   const { payload } = request;
   const { user_id, name, username, gender } = payload;
-  console.log(name, tweetId);
-   const getTweetsDetailsQuery = `
+  console.log(name, user_id);
+  const getTweetsDetailsQuery = `
             SELECT
-                *
+               tweet.tweet AS tweet,
+                COUNT(DISTINCT(like.like_id)) AS likes,
+                COUNT(DISTINCT(reply.reply_id)) AS replies,
+                tweet.date_time AS dateTime
             FROM 
-                tweet INNER JOIN like ON tweet.tweet_id = like.tweet_id INNER JOIN reply ON reply.tweet_id = tweet.tweet_id
+                user INNER JOIN tweet ON user.user_id = tweet.user_id INNER JOIN like ON like.tweet_id = tweet.tweet_id INNER JOIN reply ON reply.tweet_id = tweet.tweet_id
             WHERE 
-                tweet.user_id = ${user_id}
+                user.user_id = ${user_id}
+            GROUP BY
+                tweet.tweet_id
             ;`;
+
   const tweetsDetails = await db.all(getTweetsDetailsQuery);
   response.send(tweetsDetails);
 });
